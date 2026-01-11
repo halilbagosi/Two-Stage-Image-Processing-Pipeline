@@ -1,0 +1,94 @@
+# Stage 2: DSLR to Cinematic Film Enhancement - Training Configuration
+
+# Model Configuration
+model:
+  type: 'lut'          # 'lut' (recommended) or 'cnn'
+  lut_dim: 33          # LUT dimension (33 is standard)
+  num_luts: 1          # Number of LUTs to blend
+
+# Dataset Configuration
+dataset:
+  # For Stage 2, we use DSLR images as input and apply film looks as targets
+  dslr_dir: '../../datasets/dped/iphone/train/canon'
+  test_dslr_dir: '../../datasets/dped/iphone/test/canon'
+  
+  # Film style to emulate
+  film_style: 'cinematic'  # Options: 'cinematic', 'vintage', 'modern'
+  
+  # Film target generation
+  use_procedural: true     # Generate film targets procedurally
+  use_filmnet: false       # Use FilmNet LUTs (requires FilmNet data)
+  
+  img_size: 224
+  augment: true
+
+# Training Configuration
+training:
+  epochs: 80              # Fewer epochs needed for style transfer
+  batch_size: 16          # Larger batch for film enhancement (lighter model)
+  num_workers: 4
+  
+  # Optimizer
+  optimizer: 'adam'
+  lr: 0.0001             # Lower LR for fine-tuning style
+  betas: [0.9, 0.999]
+  weight_decay: 0.00001  # Less regularization
+  
+  # Learning rate scheduler
+  scheduler: 'cosine'
+  lr_min: 0.000001
+  
+  # Loss Configuration - Perceptual is KEY for film look
+  loss_type: 'film'      # Special film-focused loss
+  loss_weights:
+    l1: 0.5              # Lower weight on pixel accuracy
+    perceptual: 1.0      # HIGH weight on perceptual quality
+    style: 0.5           # Style loss for film aesthetics
+    color: 0.3           # Color consistency
+
+# Film Enhancement Settings
+film:
+  # Cinematic film characteristics
+  contrast_boost: 1.15    # Increase contrast
+  saturation: 1.1         # Slight saturation boost
+  shadow_lift: 0.05       # Lift shadows slightly
+  highlight_roll: 0.95    # Roll off highlights
+  
+  # Color grading
+  teal_orange: true       # Cinematic teal/orange look
+  warmth: 1.05           # Slight warmth
+  
+  # Film grain
+  add_grain: false        # Add film grain (optional)
+  grain_strength: 0.02
+
+# Validation and Checkpointing
+validation:
+  val_every: 1
+  save_images: true
+  num_save_images: 8
+
+checkpoint:
+  save_dir: './checkpoints/stage2_production'
+  save_every: 10
+  save_best: true
+  resume: null
+
+# Device Configuration
+device:
+  type: 'mps'
+  mixed_precision: false
+
+# Logging
+logging:
+  log_every: 50
+  use_wandb: false
+  wandb_project: 'zrr-stage2'
+  wandb_run_name: null
+
+# Early Stopping
+early_stopping:
+  enabled: false
+  patience: 15
+  min_delta: 0.001
+

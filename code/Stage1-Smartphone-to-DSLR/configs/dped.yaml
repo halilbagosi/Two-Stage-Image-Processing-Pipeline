@@ -1,0 +1,148 @@
+# DPED Configuration
+# Based on: https://aiff22.github.io/index.html
+# DSLR-Quality Photos on Mobile Devices with Deep Convolutional Networks (ICCV 2017)
+#
+# Architecture: 12-layer Residual Convolutional Neural Network
+# Loss: Color + Texture (Adversarial) + Content (VGG)
+# Optimized for Apple Silicon (MPS)
+
+model:
+  type: 'dped'  # DPED ResNet architecture
+  in_channels: 3
+  out_channels: 3
+
+# Dataset configuration - DPED Dataset
+# Paths are relative to code/Stage1-Smartphone-to-DSLR/
+# Place your DPED dataset at: project_root/datasets/DPED/
+#
+# DPED dataset structure:
+# datasets/DPED/
+# ├── train/
+# │   ├── phone/          (iPhone 3GS, BlackBerry Passport, or Sony Xperia Z)
+# │   └── dslr/           (Canon 70D DSLR)
+# └── test/
+#     ├── phone/
+#     └── dslr/
+#
+# Download from: https://aiff22.github.io/index.html
+dataset:
+  train_phone_dir: '../../datasets/DPED/train/phone'
+  train_dslr_dir: '../../datasets/DPED/train/dslr'
+  val_phone_dir: '../../datasets/DPED/test/phone'
+  val_dslr_dir: '../../datasets/DPED/test/dslr'
+  
+  img_size: 100  # Original DPED paper size (100x100 patches)
+  augment: true  # Standard augmentation for DPED
+  # max_samples: null  # Use FULL dataset (160k samples) - matching DPED paper
+  
+  # Standard augmentation for DPED
+  augmentation:
+    horizontal_flip: true
+    vertical_flip: false
+    rotation: 0  # DPED doesn't use rotation
+    color_jitter: false
+    brightness: 0.1
+    contrast: 0.1
+    saturation: 0.0
+    hue: 0.0
+
+# Loss configuration - DPED three-component loss (matching paper)
+loss:
+  type: 'dped'  # DPED loss: Color + Texture + Content
+  
+  # Loss weights (from DPED paper: https://aiff22.github.io/index.html)
+  w_color: 1.0      # Color loss weight (Gaussian blur + L2)
+  w_texture: 0.1    # Texture loss weight (Adversarial discriminator)
+  w_content: 0.1    # Content loss weight (VGG perceptual)
+  
+  # Color loss parameters
+  color_sigma: 1.0  # Gaussian blur sigma for color loss
+  
+  # Content loss parameters
+  use_vgg19: true  # Use VGG-19 (as per DPED paper) - more accurate but slower
+
+# Training configuration
+training:
+  num_epochs: 100
+  batch_size: 64  # Batch size for DPED training (balanced for full dataset with all losses)
+  num_workers: 0  # Set to 0 for MPS (multiprocessing causes overhead on Apple Silicon)
+  auto_optimize: false  # Disabled - using manual optimized values
+  
+  optimizer: 'adamw'  # AdamW - recommended for image enhancement (better than Adam/SGD)
+  lr: 0.0001  # Learning rate for AdamW (same as Adam)
+  momentum: 0.9  # Only used for SGD
+  nesterov: true  # Only used for SGD
+  discriminator_lr: 0.0001  # Learning rate for discriminator (if trained separately)
+  weight_decay: 0.0001  # Weight decay (decoupled in AdamW for better regularization)
+  
+  scheduler: 'cosine'
+  lr_decay_epochs: [50, 75]
+  lr_decay_gamma: 0.5
+  
+  grad_clip: 1.0
+  use_amp: false  # MPS doesn't need AMP
+  
+  val_frequency: 5  # Run validation every 5 epochs (slower but saves time)
+  save_frequency: 1  # Save checkpoint every epoch (for maximum recovery options)
+  
+  patience: 30
+  min_delta: 0.001
+
+# Checkpointing
+checkpoint:
+  save_dir: 'checkpoints/stage1_dped'
+  save_best: true
+  save_last: true
+  resume: true  # Enable auto-resume from last checkpoint
+  metric: 'psnr'
+  save_val_images: true
+  num_val_images: 10
+
+# Validation configuration
+validation:
+  save_images: true
+  num_save_images: 10
+
+# Device
+device:
+  type: 'mps'  # Apple Silicon
+
+# Logging
+logging:
+  log_dir: 'logs/stage1_dped'
+  log_frequency: 50
+  tensorboard: false
+  log_images: true
+  log_gradients: false
+  log_lr: true
+
+# Reproducibility
+seed: 42
+deterministic: false
+
+# Notes:
+# - Based on DPED paper: https://aiff22.github.io/index.html (ICCV 2017)
+# - Architecture: 12-layer Residual CNN (matching paper exactly)
+# - Loss: Color + Texture (Adversarial) + Content (VGG-19) - ALL THREE COMPONENTS
+# - CONFIGURATION MATCHING DPED PAPER:
+#   * Image size: 100x100 (original DPED paper size)
+#   * Batch size: 64 (balanced for full dataset)
+#   * Dataset: FULL 160k samples (no subset)
+#   * Augmentation: ENABLED (standard DPED augmentation)
+#   * Color loss: 1.0 (Gaussian blur + L2)
+#   * Texture loss: 0.1 (Adversarial discriminator on grayscale)
+#   * Content loss: 0.1 (VGG-19 pre-trained on ImageNet)
+#   * Optimizer: AdamW (recommended - better than Adam/SGD for image enhancement)
+#     - Learning rate: 0.0001 (standard for Adam-based optimizers)
+#     - Weight decay: 0.0001 (decoupled for better regularization)
+#     - Benefits: Better generalization, faster convergence, improved weight decay handling
+#   * num_workers: 0 (MPS doesn't benefit from multiprocessing)
+#   * Checkpoints: Saved every 5 epochs
+#   * Logging: Detailed metrics with iteration speed, batch time, ETA
+# - This matches the DPED paper training procedure
+# - Expected training time: ~2-3 hours per epoch (with all losses enabled)
+# - Optimizer options:
+#   * 'adamw' (recommended) - Best generalization, decoupled weight decay
+#   * 'adam' - Standard adaptive optimizer
+#   * 'sgd' - Traditional, set lr to 0.001 for SGD
+
